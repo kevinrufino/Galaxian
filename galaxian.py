@@ -4,7 +4,9 @@ import pygame
 import random
 import sys
 from pygame import *
-explosion_timer = 2
+
+# I recieved helped from multiple stack overflows, but forgot to add any of the links
+# pygame.org was also a huge help for understanding pygame modules
 
 
 class Overlay(pygame.sprite.Sprite):
