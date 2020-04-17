@@ -4,8 +4,7 @@ import pygame
 import random
 import sys
 from pygame import *
-num_moves_right = 50
-num_moves_left = 50
+explosion_timer = 2
 
 
 class Overlay(pygame.sprite.Sprite):
@@ -35,7 +34,6 @@ class Ship(pygame.sprite.Sprite):
     # constructor
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
-        #
         self.image = image.load('assets/ship-sprit.PNG').convert_alpha()
         self.rect = self.image.get_rect()
         self.rect.x = 275
@@ -49,24 +47,26 @@ class Enemies(pygame.sprite.Sprite):
     def __init__(self):
         pygame.sprite.Sprite.__init__(self)
         # move counter for setting enemy path
-        self.rightmoves = 180
-        self.leftmoves = 0
-        # "enemies spotted! it's the corona virus!"
+        self.right_moves = 180
+        self.left_moves = 0
+        # frame count for explosion
+        self.explosion_timer = 2
+        # "enemies spotted! it's the coronavirus!"
         self.image = image.load('assets/coronavirus.PNG').convert_alpha()
         self.rect = self.image.get_rect()
 
     def update(self, ship, enemyShots):
         # sets path for enemies
-        if self.rightmoves >= 0:
+        if self.right_moves >= 0:
             self.rect.x += 1
-            self.rightmoves -= 1
-            if self.rightmoves == 0:
-                self.leftmoves = 180
-        elif self.leftmoves >= 0:
+            self.right_moves -= 1
+            if self.right_moves == 0:
+                self.left_moves = 180
+        elif self.left_moves >= 0:
             self.rect.x -= 1
-            self.leftmoves -= 1
-            if self.leftmoves == 0:
-                self.rightmoves = 180
+            self.left_moves -= 1
+            if self.left_moves == 0:
+                self.right_moves = 180
 
         # randomly shoots
         shoot = random.randrange(1000)
@@ -86,7 +86,7 @@ class Shot(pygame.sprite.Sprite):
         # positions lasers in front of ship
         self.rect.x = -10
         self.rect.y = 700
-        # self.vector = [ 0, 0 ]
+        # not actual laser sounds
         self.thud_sound = pygame.mixer.Sound('assets/thud.wav')
 
     def update(self, game, enemies, ship):
@@ -98,9 +98,9 @@ class Shot(pygame.sprite.Sprite):
         hitObject = pygame.sprite.spritecollideany(self, enemies)
         if hitObject:
             self.thud_sound.play()
-            hitObject.kill()
             game.score += 1
             game.shots.remove(self)
+            game.phase_two(hitObject)
 
         # speed of shot
         self.rect.y -= 2
@@ -129,13 +129,8 @@ class EnemyShot(pygame.sprite.Sprite):
         # Collision with ship
         if pygame.sprite.collide_rect(self, enemies):
             self.thud_sound.play()
-            game.lives -= 1
             game.enemyShots.remove(self)
-
-            # crashes game FIX ME
-            game.ship.remove(self)
-            # crashes game FIX ME
-            hitObject.kill()
+            pygame.event.post(game.new_life_event)
 
         # speed of shot
         self.rect.y += 1
@@ -148,6 +143,8 @@ class Game:
         # pygame.mixer.music.load('assets/loop.wav')
         # pygame.mixer.music.play(-1)
         self.clock = pygame.time.Clock()
+        self.start_ticks = 0
+        self.seconds = 0
         # screen size vertical
         self.screen = pygame.display.set_mode((600, 800))
         # lasers
@@ -159,6 +156,9 @@ class Game:
         self.ship = Ship()
         # restart when you die
         self.new_life_event = pygame.event.Event(pygame.USEREVENT + 1)
+        # explosion for 1 second
+        self.explosion_event = pygame.USEREVENT + 2
+        self.e = pygame.USEREVENT + 3
         # enemy group initialization
         self.enemies = pygame.sprite.Group()
         # overlay
@@ -178,19 +178,32 @@ class Game:
                 enemy.rect.y = i * 60 + 10
                 self.enemies.add(enemy)
 
+    # this gives the enemies invunerability after they've first been shot
+    # "hard_mode: Activited!"
+    def phase_two(self, enemies):
+        enemies.image = image.load('assets/coronavirus2.PNG').convert_alpha()
+        # starter tick
+        self.start_ticks = pygame.time.get_ticks()
+        if self.seconds > 1:
+            enemies.kill()
+
     def run(self):
         self.done = False
-
         while not self.done:
             #this is the background
             self.screen.blit(self.image, (0, 0))
-            for event in pygame.event.get():
+            #timer
+            self.seconds = (pygame.time.get_ticks() - self.start_ticks) / 1000
 
+            for event in pygame.event.get():
                 # This is what happends when we lose a life
                 if event.type == self.new_life_event.type:
                     self.lives -= 1
                     if self.lives > 0:
+                        self.ship.rect.x = 275
+                        self.ship.rect.y = 700
                         self.ready = True
+
                     else:
                         pygame.quit()
                         sys.exit(0)
@@ -214,8 +227,6 @@ class Game:
 
                     if event.key == pygame.K_RIGHT:
                         self.ship.rect.x += 5
-                        # Change this so that it updates where the ball will spawn
-                        # self.balls.sprites()[0].rect.x += 5
                         if self.ship.rect.x >= 550:
                             self.ship.rect.x = 550
 
